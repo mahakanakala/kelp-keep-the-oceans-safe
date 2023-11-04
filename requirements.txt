@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+geopandas
+branca
+folium
+torch
+transformers
+streamlit_folium
