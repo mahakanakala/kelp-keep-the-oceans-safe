@@ -51,7 +51,8 @@ oil_spill_df['Longitude'] = oil_spill_df['Longitude'].apply(dms_to_dd)
 st.markdown('''
 ## Understanding Marine Environmental Impact
 
-**Oil**, an age-old fossil fuel, plays a crucial role in heating our homes, generating electricity, and driving various sectors of our economy. However, accidental oil spills in the ocean pose *significant* challenges. These spills can wreak havoc on marine life, spoil beach outings, and render seafood unsafe for consumption. Addressing these issues requires robust scientific efforts to clean up the oil, assess the pollution's impact, and aid the ocean in its recovery journey. This interactive map provides a visual representation of these environmental challenges, using data from NOAA and advanced mapping techniques.
+**Oil**, an age-old fossil fuel, plays a crucial role in heating our homes, generating electricity, and driving various sectors of our economy. However, accidental oil spills in the ocean pose *significant* challenges. These spills can wreak havoc on marine life, spoil beach outings, and render seafood unsafe for consumption. Similarly, 
+**Plastic**, a ubiquitous material in our daily lives, has found its way into the heart of our oceans, creating a pervasive environmental crisis. **Oil spills** and **plastic pollution** represent urgent environmental challenges, disrupting marine ecosystems and endangering both wildlife and human communities. This interactive map provides a visual representation of these environmental challenges, using data from NOAA and advanced mapping techniques.
 ''')
 
 oil_image = Image.open('./public/images/turtle_oil_spill_copy.png')
