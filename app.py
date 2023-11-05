@@ -18,10 +18,10 @@ from google.cloud import aiplatform
 
 fs = storage.Client()
 
-st.set_page_config(page_title="Seas the Day",
-                   page_icon=':world_map:', layout='wide')
+st.set_page_config(page_title="Kelp Keep the Oceans Safe",
+                   page_icon=':otter:', layout='wide')
 
-st.title("Seas the Day")
+st.title("Kelp Keep the Oceans Safe")
 
 GCS_BUCKET_NAME = 'seas-the-day-streamlit'
 fs = gcsfs.GCSFileSystem(project='seas-the-day-404205')

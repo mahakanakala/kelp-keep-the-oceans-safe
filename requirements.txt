@@ -6,6 +6,6 @@ folium
 torch
 transformers
 streamlit_folium
-gcsfs
+gcsfs==2023.10.0
 vertexai
 google-cloud-aiplatform
