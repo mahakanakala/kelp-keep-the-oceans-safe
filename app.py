@@ -13,6 +13,10 @@ import branca.colormap as cm
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 import vertexai
 from vertexai.language_models import TextGenerationModel
+from google.cloud import storage
+from google.cloud import aiplatform
+
+fs = storage.Client()
 
 st.set_page_config(page_title="Seas the Day",
                    page_icon=':world_map:', layout='wide')
@@ -172,6 +176,12 @@ if show_garbage_markers:
 
 st_folium(m_1, width=1300)
 
+st.divider()
+
+# Create Collection dfs
+garbage_df = pd.DataFrame(columns=['Date', 'Photo', 'Location', 'Description'])
+oil_spill_collection_df = pd.DataFrame(columns=['Date', 'Photo', 'Location', 'Description'])
+
 # Collecting Information & uploading to Google Cloud
 oil_col, garbage_col = st.columns(2)
 with oil_col:
@@ -188,7 +198,7 @@ with oil_col:
             with fs.open(f'{GCS_BUCKET_NAME}/oil_spill/{oil_spill_date}.jpg', 'wb') as f:
                 f.write(oil_spill_image_bytes.getvalue())
 
-            oil_spill_collection = oil_spill_collection.append({
+            oil_spill_collection_df = oil_spill_collection_df.append({
                 'Date': oil_spill_date,
                 'Photo': f'gs://{GCS_BUCKET_NAME}/oil_spill_collection/{oil_spill_date}.jpg',
                 'Location': oil_spill_location,
@@ -209,7 +219,7 @@ with garbage_col:
             with fs.open(f'{GCS_BUCKET_NAME}/garbage_collection/{garbage_date}.jpg', 'wb') as f:
                 f.write(garbage_image_bytes.getvalue())
 
-            oil_spill_df = oil_spill_df.append({
+            garbage_df = garbage_df.append({
                 'Date': garbage_date,
                 'Photo': f'gs://{GCS_BUCKET_NAME}/garbage_collection/{garbage_date}.jpg',
                 'Location': garbage_location,

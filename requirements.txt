@@ -8,3 +8,4 @@ transformers
 streamlit_folium
 gcsfs
 vertexai
+google-cloud-aiplatform
