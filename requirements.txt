@@ -4,7 +4,6 @@ numpy
 branca
 folium
 torch
-time
 transformers
 streamlit_folium
 gcsfs==2023.10.0
