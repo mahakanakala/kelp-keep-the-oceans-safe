@@ -107,8 +107,7 @@ to_datetime(garbage_df)
 start_loc_plastic= (np.mean(garbage_df['Latitude']),np.mean(garbage_df['Longitude']))
 start_loc_oil= (np.mean(oil_spill_df['Latitude']),np.mean(oil_spill_df['Longitude']))
 
-# Minimaps
-
+# ---
 # Garbage & Oil Heatmaps
 m_1=folium.Map(location=start_loc_plastic,
               zoom_start=2,
@@ -118,7 +117,6 @@ m_1=folium.Map(location=start_loc_plastic,
 HeatMap(data=garbage_df[['Latitude','Longitude','Total_Pieces_L']].values, 
         radius=10,
         blur=5).add_to(m_1)
-
 
 m_2=folium.Map(location=start_loc_oil,
               tiles='Open Street Map',
@@ -149,11 +147,10 @@ for _, row in oil_spill_df.iterrows():
                   icon=folium.Icon(icon='tint', prefix='fa', color='black')
                   ).add_to(m_2)
 
-# folium.CircleMarker(location=(41,29),radius=100, fill_color='red').add_to(m_1)
 latitude, longitude = 38.5, -145
 
 # Define the radius of the circle in meters (adjust as needed)
-radius = 75  # 50 kilometers
+radius = 75  
 
 # Create a CircleMarker representing the Pacific Garbage Patch
 folium.CircleMarker(location=[latitude, longitude],
@@ -164,24 +161,52 @@ folium.CircleMarker(location=[latitude, longitude],
                     fill_opacity=0.2,
                     popup='Pacific Garbage Patch').add_to(m_1)
 
-st_data = st_folium(m_1, width=1500, returned_objects=[])
-st_data = st_folium(m_2, width=1500, returned_objects=[])
+st_data = st_folium(m_1, width=1300, returned_objects=[])
+st_data = st_folium(m_2, width=1300, returned_objects=[])
 
-map_center = [(garbage_df['Latitude'].mean() + oil_spill_df['Latitude'].mean()) /2 ,
-              (garbage_df['Longitude'].mean() + oil_spill_df['Longitude'].mean()) /2]
 
-m = folium.Map(location=map_center, zoom_start=2)
+combined_map = folium.Map(location=start_loc_plastic, zoom_start=2, min_zoom=1.5, tiles='OpenStreetMap')
 
-# Add garbage patches data as a heatmap layer
-garbage_heatmap_data = [[row['Latitude'], row['Longitude']] for index, row in garbage_df.iterrows()]
-HeatMap(garbage_heatmap_data, radius=10).add_to(m)
+# Add the garbage heatmap to the combined map
+HeatMap(data=garbage_df[['Latitude', 'Longitude', 'Total_Pieces_L']].values, radius=10, blur=5).add_to(combined_map)
 
-# Add oil spills data as a separate layer with markers
-for index, row in oil_spill_df.iterrows():
-    folium.Marker([row['Latitude'], row['Longitude']], popup=row['Oil Spill Name']).add_to(m)
+# Add the oil spill markers and heatmap to the combined map
+for _, row in oil_spill_df.iterrows():
+    popup_content = f"""
+    <h3>{row['Oil Spill Name']}</h3>
+    <p><b>Location:</b> {row['Location']}</p>
+    <p><b>Date:</b> {row['Date']}</p>
+    <p><b>Number of Barrels:</b> {row['Barrels']}</p>
+    <p><b>Impact Regions:</b> {row['Impact Regions']}</p>
+    <p><b>Organisms Affected:</b> {row['Organisms Affected']}</p>
+    """
+    folium.Marker(location=[row['Latitude'], row['Longitude']],
+                  tooltip=f"<b>{row['Oil Spill Name']}</b><br># of Barrels Spilled: {row['Barrels']}",
+                  popup=folium.Popup(popup_content, max_width=800),
+                  icon=folium.Icon(icon='tint', prefix='fa', color='black')
+                  ).add_to(combined_map)
 
-# Render the map using streamlit-folium
-st_data = st_folium(m, width=1500, returned_objects=[])
+# Add the Pacific Garbage Patch CircleMarker
+latitude, longitude = 38.5, -145
+radius = 70  # Approximately 0.62 million square miles in meters
+folium.CircleMarker(location=[latitude, longitude],
+                    radius=radius,
+                    color='red',
+                    fill=True,
+                    fill_color='red',
+                    fill_opacity=0.2,
+                    popup='Pacific Garbage Patch').add_to(combined_map)
+
+# Render the combined map
+st_folium(combined_map, width=1300, height=600)
+
+
+
+
+
+
+
+
 
 # Sidebar with Chatbot
 st.sidebar.header("Question Answering Chatbot")
