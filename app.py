@@ -4,7 +4,6 @@ import numpy as np
 from PIL import Image
 
 # mapping
-import geopandas as gpd
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import HeatMap
@@ -17,7 +16,7 @@ st.set_page_config(page_title="Seas the Day with Donations",
 st.title("Seas the Day with Donations")
 
 # Import data
-garbage_df = gpd.read_file('./public/data/marine_microplastic_density.csv', encoding="latin-1")
+garbage_df = pd.read_file('./public/data/marine_microplastic_density.csv', encoding="latin-1")
 oil_spill_df = pd.read_csv('./public/data/oilspills_1967-91.csv',
                             encoding='latin-1'
                            )

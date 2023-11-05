@@ -1,12 +1,9 @@
 streamlit
 pandas
 numpy
-geopandas
 branca
 folium
 torch
 transformers
 streamlit_folium
-google.cloud
-st_files_connection
 gcsfs
