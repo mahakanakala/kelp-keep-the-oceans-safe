@@ -5,14 +5,12 @@ from PIL import Image
 import time
 from google.cloud import storage
 
-# Streamlit APIs
-
 # mapping
 import geopandas as gpd
 import folium
 from streamlit_folium import st_folium, folium_static
 from folium.plugins import MarkerCluster,HeatMap
-import branca.colormap as colormap
+import branca.colormap as cm
 from collections import defaultdict
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 
@@ -22,7 +20,7 @@ st.set_page_config(page_title="Seas the Day with Donations",
 st.title("Seas the Day with Donations")
 
 # Import data
-garbage_df = gpd.read_file('./public/data/marine_microplastic_density.csv')
+garbage_df = gpd.read_file('./public/data/marine_microplastic_density.csv', encoding="latin-1")
 oil_spill_df = pd.read_csv('./public/data/oilspills_1967-91.csv',
                             encoding='latin-1'
                            )
@@ -58,41 +56,35 @@ with images_column:
     st.subheader("Oil Spills: Impact on Wildlife")
     st.image(oil_image, caption="MSNBC showcases a photo of the sea affected by the BP's oil spill")
     barrels_spilled = oil_spill_df['Barrels'].sum()
-    recorded_spills = len(oil_spill_df)
+    recorded_spills = oil_spill_df.shape[0]
     right_metric, left_metric = st.columns(2)
     with right_metric:
-        st.metric(label="Number of Barrels of Oil Spilled", value=barrels_spilled, delta=-0.5)
+        st.metric(label= ":oil_drum: Number of Barrels of Oil Spilled", value=barrels_spilled)
     with left_metric:
-        st.metric(label="Number of Recorded Spills", value=recorded_spills, delta=-0.5)
+        st.metric(label=":chart_with_upwards_trend: Number of Recorded Spills", value=recorded_spills)
+    st.metric(label="Average Number of Increase in Oil Spills/Year", value="2", delta="22% every year from 1929-1981")
 
 with description_column:
     st.subheader("Garbage Patches: Impact on Wildlife")
     st.image(plastic_image, caption="WWF showcases a photo of a turtle affected by plastic pollution")
+    recorded_spills = len(garbage_df)
+    garbage_df['Total_Pieces_L'] = pd.to_numeric(garbage_df['Total_Pieces_L'], errors='coerce')
     plastic_density = garbage_df['Total_Pieces_L'].sum()
-    recorded_spills = len(oil_spill_df)
     right_metric, left_metric = st.columns(2)
     with right_metric:
-        st.metric(label="Plastic Pieces Found in Oceans", value=plastic_density, delta=-0.5)
+        st.metric(label=":roll_of_paper: Plastic Pieces Found in Oceans", value=plastic_density)
     with left_metric:
-        st.metric(label="Number of Patches as big as the Pacific Garbage Circle", value=recorded_spills, delta=-0.5)
-
-st.markdown('''
-
-### Taking Action Together
-Understanding the gravity of marine pollution is the first step towards conservation. By raising awareness and using innovative technologies, we can work towards a cleaner, healthier marine environment for future generations.
-
-Let's make a difference. Explore the map, learn about the impact, and join the fight against marine pollution!
-''')
+        st.metric(label=":world_map: Number of Patches as big as the Pacific Garbage Circle", value=recorded_spills)
+        
+st.divider()
 
 # Create a geom obj for plotting
 def get_geom(df,adn):
-    '''get a geometry variable'''
     df[['Latitude','Longitude']]=df[['Latitude','Longitude']].astype(dtype=float)
     df[adn] = df[adn].astype(dtype=float)
     df['Geometry'] = pd.Series([(df.loc[i,'Latitude'],df.loc[i,'Longitude']) for i in range(len(df['Latitude']))])
     
 def to_datetime(df,date_col='Date',frmt='%Y-%m-%d'):
-    '''add_date col as datetime'''
     df[date_col] =pd.to_datetime(df[date_col],errors='coerce')
     df['year'] = df[date_col].dt.year
 
@@ -107,106 +99,75 @@ to_datetime(garbage_df)
 start_loc_plastic= (np.mean(garbage_df['Latitude']),np.mean(garbage_df['Longitude']))
 start_loc_oil= (np.mean(oil_spill_df['Latitude']),np.mean(oil_spill_df['Longitude']))
 
-# ---
+st.markdown('''
+## Visualizing the Impact of Oil Spills and Garbage Patches
+*Use the multi-select button to view the layers/attributes*
+            ''')
+
 # Garbage & Oil Heatmaps
 m_1=folium.Map(location=start_loc_plastic,
               zoom_start=2,
               min_zoom=1.5,
               tiles='Open Street Map')
 
-HeatMap(data=garbage_df[['Latitude','Longitude','Total_Pieces_L']].values, 
-        radius=10,
-        blur=5).add_to(m_1)
-
-m_2=folium.Map(location=start_loc_oil,
-              tiles='Open Street Map',
-              zoom_start=2,
-              min_zoom=1.5)
-
-HeatMap(data=oil_spill_df[['Latitude','Longitude','Barrels']].values, 
-        # oil_spill_df[['Longtitude', 'Latitude', 'Density']],
-        radius=10,
-        blur=5).add_to(m_2)
-
-m_2 = folium.Map(location=[oil_spill_df['Latitude'].mean(), oil_spill_df['Longitude'].mean()], zoom_start=2)
-
-# Add markers for oil spills dynamically from the DataFrame
-for _, row in oil_spill_df.iterrows():
-    popup_content = f"""
-    <h3>{row['Oil Spill Name']}</h3>
-    <p><b>Location:</b> {row['Location']}</p>
-    <p><b>Date:</b> {row['Date']}</p>
-    <p><b>Number of Barrels:</b> {row['Barrels']}</p>
-    <p><b>Impact Regions:</b> {row['Impact Regions']}</p>
-    <p><b>Organisms Affected:</b> {row['Organisms Affected']}</p>
-    """
+col1, col2 = st.columns(2)
+with col1:
+    show_heatmap_garbage = st.checkbox("Show Garbage Heatmap")
+    show_garbage_markers = st.checkbox("Show Garbage Markers")
+with col2:
+    show_heatmap_oil = st.checkbox("Show Oil Spill Heatmap")
+    show_oil_markers = st.checkbox("Show Oil Spill Markers")
     
-    folium.Marker(location=[row['Latitude'], row['Longitude']],
-                  tooltip=f"<b>{row['Oil Spill Name']}</b><br># of Barrels Spilled: {row['Barrels']}",
-                  popup=folium.Popup(popup_content, max_width=800),
-                  icon=folium.Icon(icon='tint', prefix='fa', color='black')
-                  ).add_to(m_2)
+if show_heatmap_garbage:
+    HeatMap(data=garbage_df[['Latitude', 'Longitude', 'Total_Pieces_L']].values, radius=10, blur=5,
+            # gradient={.1: '#A1887F', .3: "#795548", 1: '#3E2723'}
+            ).add_to(m_1)
+    colormap = cm.LinearColormap(colors=['blue', 'lightgreen', 'yellow', 'orange', 'red' ],
+                                  vmin=garbage_df['Total_Pieces_L'].min(),
+                                  vmax=garbage_df['Total_Pieces_L'].max(),
+                                  caption='Total Pieces of Garbage')
 
-latitude, longitude = 38.5, -145
+    # Add colormap legend to the map at the top left corner
+    colormap.add_to(m_1)
 
-# Define the radius of the circle in meters (adjust as needed)
-radius = 75  
+if show_heatmap_oil:
+    HeatMap(data=oil_spill_df[['Latitude', 'Longitude', 'Barrels']].values, radius=10, blur=5,
+            gradient={.2: 'beige', .6: 'brown', 1: 'black'}).add_to(m_1)
+    colormap = cm.LinearColormap(colors=['blue', 'lightgreen', 'yellow', 'orange', 'red' ],
+                                  vmin=oil_spill_df['Barrels'].min(),
+                                  vmax=oil_spill_df['Barrels'].max(),
+                                  caption='Total Barrels of Oil Spilled')
+    colormap.add_to(m_1)
 
-# Create a CircleMarker representing the Pacific Garbage Patch
-folium.CircleMarker(location=[latitude, longitude],
-                    radius=radius,
-                    color='red',
-                    fill=True,
-                    fill_color='red',
-                    fill_opacity=0.2,
-                    popup='Pacific Garbage Patch').add_to(m_1)
+if show_oil_markers:
+    for _, row in oil_spill_df.iterrows():
+        popup_content = f"""
+        <h3>{row['Oil Spill Name']}</h3>
+        <p><b>Location:</b> {row['Location']}</p>
+        <p><b>Date:</b> {row['Date']}</p>
+        <p><b>Number of Barrels:</b> {row['Barrels']}</p>
+        <p><b>Impact Regions:</b> {row['Impact Regions']}</p>
+        <p><b>Organisms Affected:</b> {row['Organisms Affected']}</p>
+        """
+        folium.Marker(location=[row['Latitude'], row['Longitude']],
+                      tooltip=f"<b>{row['Oil Spill Name']}</b><br># of Barrels Spilled: {row['Barrels']}",
+                      popup=folium.Popup(popup_content, max_width=800),
+                      icon=folium.Icon(icon='tint', prefix='fa', color='black')
+                      ).add_to(m_1)
 
-st_data = st_folium(m_1, width=1300, returned_objects=[])
-st_data = st_folium(m_2, width=1300, returned_objects=[])
+if show_garbage_markers:
+        # Add the Pacific Garbage Patch CircleMarker
+    latitude, longitude = 38.5, -145
+    radius = 70  # Approximately 0.62 million square miles in meters
+    folium.CircleMarker(location=[latitude, longitude],
+                        radius=radius,
+                        color='red',
+                        fill=True,
+                        fill_color='red',
+                        fill_opacity=0.2,
+                        popup='Pacific Garbage Patch').add_to(m_1)
 
-
-combined_map = folium.Map(location=start_loc_plastic, zoom_start=2, min_zoom=1.5, tiles='OpenStreetMap')
-
-# Add the garbage heatmap to the combined map
-HeatMap(data=garbage_df[['Latitude', 'Longitude', 'Total_Pieces_L']].values, radius=10, blur=5).add_to(combined_map)
-
-# Add the oil spill markers and heatmap to the combined map
-for _, row in oil_spill_df.iterrows():
-    popup_content = f"""
-    <h3>{row['Oil Spill Name']}</h3>
-    <p><b>Location:</b> {row['Location']}</p>
-    <p><b>Date:</b> {row['Date']}</p>
-    <p><b>Number of Barrels:</b> {row['Barrels']}</p>
-    <p><b>Impact Regions:</b> {row['Impact Regions']}</p>
-    <p><b>Organisms Affected:</b> {row['Organisms Affected']}</p>
-    """
-    folium.Marker(location=[row['Latitude'], row['Longitude']],
-                  tooltip=f"<b>{row['Oil Spill Name']}</b><br># of Barrels Spilled: {row['Barrels']}",
-                  popup=folium.Popup(popup_content, max_width=800),
-                  icon=folium.Icon(icon='tint', prefix='fa', color='black')
-                  ).add_to(combined_map)
-
-# Add the Pacific Garbage Patch CircleMarker
-latitude, longitude = 38.5, -145
-radius = 70  # Approximately 0.62 million square miles in meters
-folium.CircleMarker(location=[latitude, longitude],
-                    radius=radius,
-                    color='red',
-                    fill=True,
-                    fill_color='red',
-                    fill_opacity=0.2,
-                    popup='Pacific Garbage Patch').add_to(combined_map)
-
-# Render the combined map
-st_folium(combined_map, width=1300, height=600)
-
-
-
-
-
-
-
-
+st_folium(m_1, width=1300)
 
 # Sidebar with Chatbot
 st.sidebar.header("Question Answering Chatbot")
@@ -240,13 +201,3 @@ if question:
     }
     answer = nlp(QA_input)
     st.sidebar.write("Answer:", answer['answer'])
-
-
-# # Store the DataFrame as a CSV file
-# scraped_data.to_csv('scraped_data.csv', index=False)
-
-# # Upload the CSV file to Google Cloud Storage
-# client = storage.Client()
-# bucket = client.get_bucket('your-bucket-name')
-# blob = bucket.blob('scraped_data.csv')
-# blob.upload_from_filename('scraped_data.csv')
