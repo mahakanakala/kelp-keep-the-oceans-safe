@@ -2,16 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from PIL import Image
-import time
-from google.cloud import storage
 
 # mapping
 import geopandas as gpd
 import folium
-from streamlit_folium import st_folium, folium_static
-from folium.plugins import MarkerCluster,HeatMap
+from streamlit_folium import st_folium
+from folium.plugins import HeatMap
 import branca.colormap as cm
-from collections import defaultdict
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 
 st.set_page_config(page_title="Seas the Day with Donations",
