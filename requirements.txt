@@ -7,3 +7,4 @@ folium
 torch
 transformers
 streamlit_folium
+google.cloud

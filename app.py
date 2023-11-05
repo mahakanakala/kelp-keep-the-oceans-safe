@@ -1,12 +1,17 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from PIL import Image
+import time
+from google.cloud import storage
+
+# Streamlit APIs
 
 # mapping
 import geopandas as gpd
 import folium
 from streamlit_folium import st_folium, folium_static
-from folium.plugins import MarkerCluster,HeatMap,HeatMapWithTime
+from folium.plugins import MarkerCluster,HeatMap
 import branca.colormap as colormap
 from collections import defaultdict
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
@@ -16,28 +21,11 @@ st.set_page_config(page_title="Seas the Day with Donations",
 
 st.title("Seas the Day with Donations")
 
-st.markdown('''
-## Understanding Marine Environmental Impact
-
-Marine pollution, caused by oil spills and garbage patches, poses a significant threat to marine life. This interactive map provides a visual representation of these environmental challenges, using data from NOAA and advanced mapping techniques.
-
-### Exploring Oil Spills & Garbage Patches
-> Dive into the world of marine pollution and explore the global distribution of oil spills and garbage patches. The map showcases real-time data, allowing users to visualize the impact of these pollutants on our oceans.
-
-### Unveiling the Impact
-Oil spills disrupt marine ecosystems, coating wildlife in oil and leading to devastating consequences for aquatic organisms. Garbage patches, consisting of accumulated plastic waste, pose a long-lasting threat to marine life, causing ingestion and entanglement.
-
-### Taking Action Together
-Understanding the gravity of marine pollution is the first step towards conservation. By raising awareness and using innovative technologies, we can work towards a cleaner, healthier marine environment for future generations.
-
-Let's make a difference. Explore the map, learn about the impact, and join the fight against marine pollution!
-''')
-
-# st.image()
-
 # Import data
 garbage_df = gpd.read_file('./public/data/marine_microplastic_density.csv')
-oil_spill_df = pd.read_csv('./public/data/oilspills_1967-91.csv', encoding='latin-1')
+oil_spill_df = pd.read_csv('./public/data/oilspills_1967-91.csv',
+                            encoding='latin-1'
+                           )
 
 # Convert the Degrees Minutes Seconds format to Degrees for Folium plotting in the oil_spill_df
 def dms_to_dd(dms_value):
@@ -54,6 +42,47 @@ def dms_to_dd(dms_value):
 
 oil_spill_df['Latitude'] = oil_spill_df['Latitude'].apply(dms_to_dd)
 oil_spill_df['Longitude'] = oil_spill_df['Longitude'].apply(dms_to_dd)
+
+st.markdown('''
+## Understanding Marine Environmental Impact
+
+**Oil**, an age-old fossil fuel, plays a crucial role in heating our homes, generating electricity, and driving various sectors of our economy. However, accidental oil spills in the ocean pose *significant* challenges. These spills can wreak havoc on marine life, spoil beach outings, and render seafood unsafe for consumption. Addressing these issues requires robust scientific efforts to clean up the oil, assess the pollution's impact, and aid the ocean in its recovery journey. This interactive map provides a visual representation of these environmental challenges, using data from NOAA and advanced mapping techniques.
+''')
+
+oil_image = Image.open('./public/images/turtle_oil_spill_copy.png')
+plastic_image = Image.open('./public/images/turtle_plastic.jpeg')
+
+images_column, description_column = st.columns(2)
+
+with images_column:
+    st.subheader("Oil Spills: Impact on Wildlife")
+    st.image(oil_image, caption="MSNBC showcases a photo of the sea affected by the BP's oil spill")
+    barrels_spilled = oil_spill_df['Barrels'].sum()
+    recorded_spills = len(oil_spill_df)
+    right_metric, left_metric = st.columns(2)
+    with right_metric:
+        st.metric(label="Number of Barrels of Oil Spilled", value=barrels_spilled, delta=-0.5)
+    with left_metric:
+        st.metric(label="Number of Recorded Spills", value=recorded_spills, delta=-0.5)
+
+with description_column:
+    st.subheader("Garbage Patches: Impact on Wildlife")
+    st.image(plastic_image, caption="WWF showcases a photo of a turtle affected by plastic pollution")
+    plastic_density = garbage_df['Total_Pieces_L'].sum()
+    recorded_spills = len(oil_spill_df)
+    right_metric, left_metric = st.columns(2)
+    with right_metric:
+        st.metric(label="Plastic Pieces Found in Oceans", value=plastic_density, delta=-0.5)
+    with left_metric:
+        st.metric(label="Number of Patches as big as the Pacific Garbage Circle", value=recorded_spills, delta=-0.5)
+
+st.markdown('''
+
+### Taking Action Together
+Understanding the gravity of marine pollution is the first step towards conservation. By raising awareness and using innovative technologies, we can work towards a cleaner, healthier marine environment for future generations.
+
+Let's make a difference. Explore the map, learn about the impact, and join the fight against marine pollution!
+''')
 
 # Create a geom obj for plotting
 def get_geom(df,adn):
@@ -73,12 +102,12 @@ get_geom(oil_spill_df, "Barrels")
 
 # Apply Date Time function
 to_datetime(garbage_df)
-to_datetime(oil_spill_df)
 
 # Find the ideal frame for loading the render window
 start_loc_plastic= (np.mean(garbage_df['Latitude']),np.mean(garbage_df['Longitude']))
 start_loc_oil= (np.mean(oil_spill_df['Latitude']),np.mean(oil_spill_df['Longitude']))
 
+# Minimaps
 
 # Garbage & Oil Heatmaps
 m_1=folium.Map(location=start_loc_plastic,
@@ -96,7 +125,6 @@ m_2=folium.Map(location=start_loc_oil,
               zoom_start=2,
               min_zoom=1.5)
 
-#heatmap:
 HeatMap(data=oil_spill_df[['Latitude','Longitude','Barrels']].values, 
         # oil_spill_df[['Longtitude', 'Latitude', 'Density']],
         radius=10,
@@ -121,15 +149,27 @@ for _, row in oil_spill_df.iterrows():
                   icon=folium.Icon(icon='tint', prefix='fa', color='black')
                   ).add_to(m_2)
 
-# folium_static(m_1)
+# folium.CircleMarker(location=(41,29),radius=100, fill_color='red').add_to(m_1)
+latitude, longitude = 38.5, -145
+
+# Define the radius of the circle in meters (adjust as needed)
+radius = 75  # 50 kilometers
+
+# Create a CircleMarker representing the Pacific Garbage Patch
+folium.CircleMarker(location=[latitude, longitude],
+                    radius=radius,
+                    color='red',
+                    fill=True,
+                    fill_color='red',
+                    fill_opacity=0.2,
+                    popup='Pacific Garbage Patch').add_to(m_1)
+
 st_data = st_folium(m_1, width=1500, returned_objects=[])
 st_data = st_folium(m_2, width=1500, returned_objects=[])
-# folium_static(m_2)
 
 map_center = [(garbage_df['Latitude'].mean() + oil_spill_df['Latitude'].mean()) /2 ,
               (garbage_df['Longitude'].mean() + oil_spill_df['Longitude'].mean()) /2]
 
-# Create a folium map
 m = folium.Map(location=map_center, zoom_start=2)
 
 # Add garbage patches data as a heatmap layer
@@ -154,7 +194,7 @@ question = st.sidebar.text_input("Enter your question:")
 
 # Contextualization
 context = '''
-            You are an LLM built to be knowledgeable on a data science project submission to the NJIT Hackathon. This is a project about the forecasting. The data set is from GCAG, this is the website 
+            You are an LLM built to be knowledgeable on a data science project submission to the NJIT Hackathon. This is a project about the data visualization. The data set is from GCAG, this is the website 
             that has more info on the data: https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/national/data-info. 
             You are hosted on a Streamlit app.
 '''
@@ -175,3 +215,13 @@ if question:
     }
     answer = nlp(QA_input)
     st.sidebar.write("Answer:", answer['answer'])
+
+
+# # Store the DataFrame as a CSV file
+# scraped_data.to_csv('scraped_data.csv', index=False)
+
+# # Upload the CSV file to Google Cloud Storage
+# client = storage.Client()
+# bucket = client.get_bucket('your-bucket-name')
+# blob = bucket.blob('scraped_data.csv')
+# blob.upload_from_filename('scraped_data.csv')
