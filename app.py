@@ -10,10 +10,10 @@ from folium.plugins import HeatMap
 import branca.colormap as cm
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 
-st.set_page_config(page_title="Seas the Day with Donations",
+st.set_page_config(page_title="Seas the Day",
                    page_icon=':world_map:', layout='wide')
 
-st.title("Seas the Day with Donations")
+st.title("Seas the Day")
 
 # Import data
 garbage_df = pd.read_file('./public/data/marine_microplastic_density.csv', encoding="latin-1")
@@ -75,7 +75,7 @@ with description_column:
 st.divider()
 
 # Create a geom obj for plotting
-def get_geom(df,adn):
+def prepare_heatmap(df,adn):
     df[['Latitude','Longitude']]=df[['Latitude','Longitude']].astype(dtype=float)
     df[adn] = df[adn].astype(dtype=float)
     df['Geometry'] = pd.Series([(df.loc[i,'Latitude'],df.loc[i,'Longitude']) for i in range(len(df['Latitude']))])
@@ -85,8 +85,8 @@ def to_datetime(df,date_col='Date',frmt='%Y-%m-%d'):
     df['year'] = df[date_col].dt.year
 
 # Apply the get_geom function
-get_geom(garbage_df,'Total_Pieces_L')
-get_geom(oil_spill_df, "Barrels")
+prepare_heatmap(garbage_df,'Total_Pieces_L')
+prepare_heatmap(oil_spill_df, "Barrels")
 
 # Apply Date Time function
 to_datetime(garbage_df)
