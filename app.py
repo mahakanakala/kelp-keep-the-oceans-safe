@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 import io
 import gcsfs
+import time
 
 # mapping
 import folium
@@ -193,6 +194,8 @@ with oil_col:
     oil_spill_photo = st.file_uploader("Upload Photo of Incident", type=["jpg", "jpeg", "png"])
 
     if st.button("Report Oil Spill"):
+        time.sleep(.5)
+        st.toast('Reported Oil Spill Incident')
         if oil_spill_date and oil_spill_location and oil_spill_description and oil_spill_photo:
             oil_spill_image_bytes = io.BytesIO(oil_spill_photo.read())
 
@@ -214,6 +217,8 @@ with garbage_col:
     garbage_photo = st.file_uploader("Upload Photo of Incident", type=["jpg", "jpeg", "png"],  key="garbage_image")
 
     if st.button("Report Garbage Incident"):
+        time.sleep(.5)
+        st.toast('Reported Garbage Incident')
         if garbage_date and garbage_location and garbage_description and garbage_photo:
             garbage_image_bytes = io.BytesIO(garbage_photo.read())
 
