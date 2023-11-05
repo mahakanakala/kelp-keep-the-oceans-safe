@@ -7,3 +7,4 @@ torch
 transformers
 streamlit_folium
 gcsfs
+vertexai

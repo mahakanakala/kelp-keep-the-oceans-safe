@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from PIL import Image
+import io
+import gcsfs
 
 # mapping
 import folium
@@ -9,11 +11,16 @@ from streamlit_folium import st_folium
 from folium.plugins import HeatMap
 import branca.colormap as cm
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
+import vertexai
+from vertexai.language_models import TextGenerationModel
 
 st.set_page_config(page_title="Seas the Day",
                    page_icon=':world_map:', layout='wide')
 
 st.title("Seas the Day")
+
+GCS_BUCKET_NAME = 'seas-the-day-streamlit'
+fs = gcsfs.GCSFileSystem(project='seas-the-day-404205')
 
 # Import data
 garbage_df = pd.read_csv('./public/data/marine_microplastic_density.csv', encoding="latin-1")
@@ -58,7 +65,7 @@ with images_column:
         st.metric(label= ":oil_drum: Number of Barrels of Oil Spilled", value=barrels_spilled)
     with left_metric:
         st.metric(label=":chart_with_upwards_trend: Number of Recorded Spills", value=recorded_spills)
-    st.metric(label="Average Number of Increase in Oil Spills/Year", value="2", delta="22% every year from 1929-1981")
+    st.metric(label="Average Number of Increase in Oil Spills/Year", value="2", delta="22% every year from 1929-1981", delta_color='inverse')
 
 with description_column:
     st.subheader("Garbage Patches: Impact on Wildlife")
@@ -165,35 +172,91 @@ if show_garbage_markers:
 
 st_folium(m_1, width=1300)
 
+# Collecting Information & uploading to Google Cloud
+oil_col, garbage_col = st.columns(2)
+with oil_col:
+    st.header("Report Oil Spill Incident")
+    oil_spill_date = st.date_input("Date of Incident")
+    oil_spill_location = st.text_input("Location")
+    oil_spill_description = st.text_area("Description")
+    oil_spill_photo = st.file_uploader("Upload Photo of Incident", type=["jpg", "jpeg", "png"])
+
+    if st.button("Report Oil Spill"):
+        if oil_spill_date and oil_spill_location and oil_spill_description and oil_spill_photo:
+            oil_spill_image_bytes = io.BytesIO(oil_spill_photo.read())
+
+            with fs.open(f'{GCS_BUCKET_NAME}/oil_spill/{oil_spill_date}.jpg', 'wb') as f:
+                f.write(oil_spill_image_bytes.getvalue())
+
+            oil_spill_collection = oil_spill_collection.append({
+                'Date': oil_spill_date,
+                'Photo': f'gs://{GCS_BUCKET_NAME}/oil_spill_collection/{oil_spill_date}.jpg',
+                'Location': oil_spill_location,
+                'Description': oil_spill_description
+            }, ignore_index=True)
+
+with garbage_col:
+    st.header("Report Garbage Incident")
+    garbage_date = st.date_input("Date of Incident", key="garbage_date")
+    garbage_location = st.text_input("Location",  key="garbage_location")
+    garbage_description = st.text_area("Description",  key="garbage_description")
+    garbage_photo = st.file_uploader("Upload Photo of Incident", type=["jpg", "jpeg", "png"],  key="garbage_image")
+
+    if st.button("Report Garbage Incident"):
+        if garbage_date and garbage_location and garbage_description and garbage_photo:
+            garbage_image_bytes = io.BytesIO(garbage_photo.read())
+
+            with fs.open(f'{GCS_BUCKET_NAME}/garbage_collection/{garbage_date}.jpg', 'wb') as f:
+                f.write(garbage_image_bytes.getvalue())
+
+            oil_spill_df = oil_spill_df.append({
+                'Date': garbage_date,
+                'Photo': f'gs://{GCS_BUCKET_NAME}/garbage_collection/{garbage_date}.jpg',
+                'Location': garbage_location,
+                'Description': garbage_description
+            }, ignore_index=True)
+
+
 # Sidebar with Chatbot
-st.sidebar.header("Question Answering Chatbot")
+st.sidebar.title("Question Answering Chatbot using VertexAI")
+vertexai.init(project="seas-the-day-404205", location="us-central1")
+
+model = TextGenerationModel.from_pretrained("text-bison")
+
 st.sidebar.markdown('''
-                    Made using [deepset/roberta-base-squad2](https://huggingface.co/deepset/roberta-base-squad2?context=You+are+a+LLM+built+to+knowledgable+on+my+data+science+project+submission.+This+is+a+project+about+the+forecasting+model+of+global+temperatures.+The+data+set+is+from+GCAG.+You+are+hosted+on+a+Streamlit+app.&question=What+is+the+data?). 
-                    Ask any questions about our project!
+                    Welcome to Seas the Day Chatbot! Ask any questions about our project. I am built using [Vertex AI](https://cloud.google.com/vertex-ai?hl=en) from Google
                     ''')
-# User input box
 question = st.sidebar.text_input("Enter your question:")
 
 # Contextualization
 context = '''
-            You are an LLM built to be knowledgeable on a data science project submission to the NJIT Hackathon. This is a project about the data visualization. The data set is from GCAG, this is the website 
-            that has more info on the data: https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/national/data-info. 
-            You are hosted on a Streamlit app.
+            Welcome to Seas the Day Chatbot! Ask any questions about our project.
+            Seas the Day Chatbot is your virtual assistant dedicated to ocean conservation and environmental protection. Whether you have questions about oil spills, garbage patches, marine life, or eco-friendly initiatives, I\'m here to help.
+
+            Info about the project: It is hosted on Streamlit and it is a data visualization project of geospatial data (mapped using Folium) of oil spills and garbage patches.
+
+            **How I Can Assist You:**
+            - Provide information about recent oil spill incidents and their impact on marine life.
+            - Share insights about garbage patches in the oceans and their environmental consequences.
+            - Answer questions about eco-friendly practices and initiatives for ocean conservation.
+            - Assist in identifying marine life and their habitats.
+            - Offer guidance on reporting and responding to environmental incidents.
+
+            - I\'m here to provide information and assistance based on available data and knowledge up to my last update in November 2023.
+            - For urgent or real-time environmental emergencies, please contact local authorities and environmental organizations.
+            - Trained by Maha Kanakala
+            Feel free to ask any questions related to ocean conservation, and I\'ll do my best to provide accurate and helpful answers!
 '''
 
-# Model training
-model_name = "deepset/roberta-base-squad2"
+# Parameters for text generation
+parameters = {
+    "candidate_count": 1,
+    "max_output_tokens": 1024,
+    "temperature": 0.21,
+    "top_p": 0.8,
+    "top_k": 40
+}
 
-# Load model & tokenizer
-model = AutoModelForQuestionAnswering.from_pretrained(model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-# Intializing deepset/roberta-base-squad2 model and getting answer instances from pipeline
 if question:
-    nlp = pipeline('question-answering', model=model, tokenizer=tokenizer)
-    QA_input = {
-        'question': question,
-        'context': context
-    }
-    answer = nlp(QA_input)
-    st.sidebar.write("Answer:", answer['answer'])
+    response = model.predict(context + "\n" + question, **parameters)
+    st.sidebar.write("Answer:", response.text)
