@@ -11,11 +11,10 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import HeatMap
 import branca.colormap as cm
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
+# from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 import vertexai
 from vertexai.language_models import TextGenerationModel
 from google.cloud import storage
-from google.cloud import aiplatform
 
 fs = storage.Client()
 
