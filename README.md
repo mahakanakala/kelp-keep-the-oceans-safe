@@ -1,6 +1,8 @@
-# Kelp Keep the Oceans Safe
+# Visit the [website](https://kelp-keep-the-oceans-safe.streamlit.app/)
 
- This project utilizes geospatial data visualization techniques to map and analyze incidents of oil spills and garbage patches, providing valuable insights into their locations, impacts, and trends.
+This project utilizes geospatial data visualization techniques to map and analyze incidents of oil spills and garbage patches, providing valuable insights into their locations, impacts, and trends.
+
+## 🏆 Winner of NJIT Hackathon Fall 23 (Best use of Google Cloud)
 
 ## Table of Contents
 
@@ -20,7 +22,7 @@ It is designed to inform and engage users by visualizing real-time data about oi
 - **Interactive Map:** Explore the global distribution of oil spills and garbage patches using an interactive map.
 - **Incident Details:** Click on map markers to view detailed information about specific incidents, including dates, locations, and impact regions.
 - **User Contributions:** Allow users to report new oil spills and garbage incidents by uploading photos and descriptions.
-- **Question-Answering Chatbot:** Interact with a chatbot to ask questions related to ocean conservation and receive informative responses.
+- **Question-Answering Chatbot:** Interact with a chatbot developed using VerteAI to ask questions related to ocean conservation and receive informative responses.
 
 ## Technologies Used
 
