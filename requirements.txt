@@ -3,6 +3,7 @@ pandas
 numpy
 branca
 folium
+streamlit_folium
 torch
 transformers
 streamlit_folium
