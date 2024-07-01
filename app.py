@@ -114,7 +114,8 @@ st.markdown('''
 m_1=folium.Map(location=start_loc_plastic,
               zoom_start=2,
               min_zoom=1.5,
-              tiles='Open Street Map')
+              tiles='Open Street Map',
+              attr="<a href=https://endless-sky.github.io/>Endless Sky</a>")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -233,18 +234,14 @@ with garbage_col:
 # Sidebar with Chatbot
 st.sidebar.title("Question Answering Chatbot using RoBERTa")
 
-# Load the model and tokenizer
 model_name = "deepset/roberta-base-squad2"
 model = AutoModelForQuestionAnswering.from_pretrained(model_name)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-# Initialize the pipeline
 nlp = pipeline('question-answering', model=model, tokenizer=tokenizer)
 
-# Sidebar input for user's question
 question = st.sidebar.text_input("Enter your question:")
 
-# Contextual information
 context = '''
             Welcome to Seas the Day Chatbot! Ask any questions about our project.
             Seas the Day Chatbot is your virtual assistant dedicated to ocean conservation and environmental protection. Whether you have questions about oil spills, garbage patches, marine life, or eco-friendly initiatives, I'm here to help.
