@@ -11,9 +11,7 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import HeatMap
 import branca.colormap as cm
-# from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
-import vertexai
-from vertexai.language_models import TextGenerationModel
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 from google.cloud import storage
 
 fs = storage.Client()
@@ -233,20 +231,23 @@ with garbage_col:
 
 
 # Sidebar with Chatbot
-st.sidebar.title("Question Answering Chatbot using VertexAI")
-vertexai.init(project="seas-the-day-404205", location="us-central1")
+st.sidebar.title("Question Answering Chatbot using RoBERTa")
 
-model = TextGenerationModel.from_pretrained("text-bison")
+# Load the model and tokenizer
+model_name = "deepset/roberta-base-squad2"
+model = AutoModelForQuestionAnswering.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-st.sidebar.markdown('''
-                    Welcome to Seas the Day Chatbot! Ask any questions about our project. I am built using [Vertex AI](https://cloud.google.com/vertex-ai?hl=en) from Google
-                    ''')
+# Initialize the pipeline
+nlp = pipeline('question-answering', model=model, tokenizer=tokenizer)
+
+# Sidebar input for user's question
 question = st.sidebar.text_input("Enter your question:")
 
-# Contextualization
+# Contextual information
 context = '''
             Welcome to Seas the Day Chatbot! Ask any questions about our project.
-            Seas the Day Chatbot is your virtual assistant dedicated to ocean conservation and environmental protection. Whether you have questions about oil spills, garbage patches, marine life, or eco-friendly initiatives, I\'m here to help.
+            Seas the Day Chatbot is your virtual assistant dedicated to ocean conservation and environmental protection. Whether you have questions about oil spills, garbage patches, marine life, or eco-friendly initiatives, I'm here to help.
 
             Info about the project: It is hosted on Streamlit and it is a data visualization project of geospatial data (mapped using Folium) of oil spills and garbage patches.
 
@@ -257,21 +258,17 @@ context = '''
             - Assist in identifying marine life and their habitats.
             - Offer guidance on reporting and responding to environmental incidents.
 
-            - I\'m here to provide information and assistance based on available data and knowledge up to my last update in November 2023.
+            - I'm here to provide information and assistance based on available data and knowledge up to my last update in November 2023.
             - For urgent or real-time environmental emergencies, please contact local authorities and environmental organizations.
             - Trained by Maha Kanakala
-            Feel free to ask any questions related to ocean conservation, and I\'ll do my best to provide accurate and helpful answers!
+            Feel free to ask any questions related to ocean conservation, and I'll do my best to provide accurate and helpful answers!
 '''
 
-# Parameters for text generation
-parameters = {
-    "candidate_count": 1,
-    "max_output_tokens": 1024,
-    "temperature": 0.21,
-    "top_p": 0.8,
-    "top_k": 40
-}
-
 if question:
-    response = model.predict(context + "\n" + question, **parameters)
-    st.sidebar.write("Answer:", response.text)
+    nlp = pipeline('question-answering', model=model, tokenizer=tokenizer)
+    QA_input = {
+        'question': question,
+        'context': context
+    }
+    answer = nlp(QA_input)
+    st.sidebar.write("Answer:", answer['answer'])
