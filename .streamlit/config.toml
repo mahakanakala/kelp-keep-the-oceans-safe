@@ -1,3 +1,9 @@
 [theme]
 base="dark"
 primaryColor="#4be3ff"
+
+[server]
+enableCORS = true
+
+[browser]
+gatherUsageStats = true
