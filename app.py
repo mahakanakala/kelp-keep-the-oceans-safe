@@ -6,27 +6,27 @@ import io
 import os
 import time
 from dotenv import load_dotenv
+import streamlit.components.v1 as components
 
 load_dotenv()
-
 GA_ID = os.getenv('GOOGLE_ANALYTICS_ID')
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+# DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-def google_analytics():
-    if GA_ID:
-        debug_param = "?debug_mode=true" if DEBUG else ""
-        return f"""
-        <!-- Global site tag (gtag.js) - Google Analytics -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}{debug_param}"></script>
-        <script>
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){{dataLayer.push(arguments);}}
-            gtag('js', new Date());
-            gtag('config', '{GA_ID}');
-            {'console.log("Google Analytics Debug Mode: Active");' if DEBUG else ''}
-        </script>
-        """
-    return ""
+def inject_ga():
+    """Inject Google Analytics tracking code"""
+    if not GA_ID:
+        return
+    
+    try:
+        with open("google_analytics.html", "r") as f:
+            ga_html = f.read()
+            
+        ga_html = ga_html.replace('%%GOOGLE_ANALYTICS_ID%%', GA_ID)
+        components.html(ga_html, height=0)
+    except Exception as e:
+        st.error(f"Failed to inject Google Analytics: {str(e)}")
+
+inject_ga()
 
 # mapping
 import folium
