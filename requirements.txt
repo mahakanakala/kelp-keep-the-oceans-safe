@@ -6,4 +6,11 @@ folium
 streamlit_folium
 torch
 transformers
-gcsfs==2023.10.0
+dotenv
+accelerate
+psycopg2-binary
+sqlalchemy
+python-dotenv
+pandas
+pytest
+pytest-asyncio
