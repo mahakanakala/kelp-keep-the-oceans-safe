@@ -5,6 +5,28 @@ from PIL import Image
 import io
 import os
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
+
+GA_ID = os.getenv('GOOGLE_ANALYTICS_ID')
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+
+def google_analytics():
+    if GA_ID:
+        debug_param = "?debug_mode=true" if DEBUG else ""
+        return f"""
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}{debug_param}"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){{dataLayer.push(arguments);}}
+            gtag('js', new Date());
+            gtag('config', '{GA_ID}');
+            {'console.log("Google Analytics Debug Mode: Active");' if DEBUG else ''}
+        </script>
+        """
+    return ""
 
 # mapping
 import folium
@@ -15,10 +37,9 @@ from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 import torch
 
 # database
-from src.database import get_engine, test_connection
+from database import get_engine, test_connection
 from sqlalchemy import text
 
-# Create local storage directories if they don't exist
 os.makedirs('uploads/oil_spills', exist_ok=True)
 os.makedirs('uploads/garbage', exist_ok=True)
 
@@ -108,9 +129,6 @@ def get_recent_reports():
     except Exception as e:
         st.error(f"Error loading reports: {str(e)}")
         return None, None
-
-st.set_page_config(page_title="Kelp Keep the Oceans Safe",
-                   page_icon=':otter:', layout='wide')
 
 st.title("Kelp Keep the Oceans Safe")
 
@@ -374,11 +392,7 @@ context = '''
 if question and nlp is not None:
     try:
         with st.spinner('Processing your question...'):
-            QA_input = {
-                'question': question,
-                'context': context
-            }
-            answer = nlp(QA_input)
+            answer = nlp(question=question, context=context)
             st.sidebar.write("Answer:", answer['answer'])
     except Exception as e:
         st.sidebar.error(f"Error processing question: {str(e)}")
