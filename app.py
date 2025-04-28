@@ -37,7 +37,7 @@ from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 import torch
 
 # database
-from database import get_engine, test_connection
+from src.database import get_engine, test_connection
 from sqlalchemy import text
 
 os.makedirs('uploads/oil_spills', exist_ok=True)
