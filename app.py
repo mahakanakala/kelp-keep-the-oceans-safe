@@ -2,11 +2,24 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from PIL import Image
-import io
 import os
 import time
 from dotenv import load_dotenv
 import streamlit.components.v1 as components
+
+# mapping
+import folium
+from streamlit_folium import st_folium
+from folium.plugins import HeatMap
+import branca.colormap as cm
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
+
+from src.supabase_data import (
+    get_marine_debris_data,
+    get_oil_spills_data,
+    save_incident_report,
+    init_supabase
+)
 
 load_dotenv()
 GA_ID = os.getenv('GOOGLE_ANALYTICS_ID')
@@ -28,68 +41,44 @@ def inject_ga():
 
 inject_ga()
 
-# mapping
-import folium
-from streamlit_folium import st_folium
-from folium.plugins import HeatMap
-import branca.colormap as cm
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
-import torch
-
 # database
-from src.database import get_engine, test_connection
+from src.supabase_data import (
+    get_marine_debris_data,
+    get_oil_spills_data
+)
 from sqlalchemy import text
 
 os.makedirs('uploads/oil_spills', exist_ok=True)
 os.makedirs('uploads/garbage', exist_ok=True)
 
-# Initialize connection to database
-@st.cache_resource
-def init_connection():
-    try:
-        if not test_connection():
-            st.error("Could not connect to database. Please check your configuration.")
-            return None
-        return get_engine()
-    except Exception as e:
-        st.error(f"Database connection error: {str(e)}")
-        return None
+# init Supabase connection
+conn = init_supabase()
 
-# Load data from database
+# load data from Supabase
 @st.cache_data
 def load_data():
     try:
-        engine = init_connection()
-        if engine is None:
-            return None, None
+        marine_debris_data = get_marine_debris_data()
+        garbage_df = pd.DataFrame(marine_debris_data)
         
-        # Load garbage data
-        garbage_df = pd.read_sql_query(
-            "SELECT * FROM marine_microplastic_density",
-            engine
-        )
-        
-        # Load oil spill data
-        oil_spill_df = pd.read_sql_query(
-            "SELECT * FROM oil_spills_historical",
-            engine
-        )
+        oil_spills_data = get_oil_spills_data()
+        oil_spill_df = pd.DataFrame(oil_spills_data)
         
         return garbage_df, oil_spill_df
     except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        return None, None
+        st.error(f"Error loading data from Supabase: {str(e)}")
+        return pd.DataFrame(), pd.DataFrame()
 
 def save_incident_report(incident_type, date, location, description, photo_path):
     """Save an incident report to the database"""
     try:
-        engine = init_connection()
-        if engine is None:
+        conn = init_supabase()
+        if conn is None:
             return False
             
         table_name = "reported_oil_spills" if incident_type == "oil" else "reported_garbage_incidents"
         
-        with engine.connect() as conn:
+        with conn.connect() as conn:
             conn.execute(
                 text(f"""
                     INSERT INTO {table_name} (date, location, description, photo_path)
@@ -111,18 +100,18 @@ def save_incident_report(incident_type, date, location, description, photo_path)
 def get_recent_reports():
     """Get recent incident reports from both tables"""
     try:
-        engine = init_connection()
-        if engine is None:
+        conn = init_supabase()
+        if conn is None:
             return None, None
             
         oil_reports = pd.read_sql_query(
             "SELECT * FROM reported_oil_spills ORDER BY created_at DESC LIMIT 10",
-            engine
+            conn
         )
         
         garbage_reports = pd.read_sql_query(
             "SELECT * FROM reported_garbage_incidents ORDER BY created_at DESC LIMIT 10",
-            engine
+            conn
         )
         
         return oil_reports, garbage_reports
@@ -132,27 +121,54 @@ def get_recent_reports():
 
 st.title("Kelp Keep the Oceans Safe")
 
+# # Initialize database connection
+# if test_connection():
+#     st.success("✅ Connected to database successfully!")
+    
+#     # Display table information
+#     if st.button("Show Database Info"):
+#         table_info = get_table_info()
+        
+#         st.write("### Database Tables")
+#         for table_name, info in table_info.items():
+#             st.write(f"- **{table_name}**: {info['count']} rows")
+            
+#             # Show sample data if available
+#             if info['sample']:
+#                 st.write("Sample data:")
+#                 st.dataframe(info['sample'])
+# else:
+#     st.error("❌ Could not connect to database. Please check your configuration.")
+# Debug info
+# st.write("Oil Spill DataFrame Info:")
+# st.write("Columns:", list(oil_spill_df.columns) if not oil_spill_df.empty else "No data")
+# st.write("\nGarbage DataFrame Info:")
+# st.write("Columns:", list(garbage_df.columns) if not garbage_df.empty else "No data")
+
 # Load data
 garbage_df, oil_spill_df = load_data()
-if garbage_df is None or oil_spill_df is None:
-    st.error("Failed to load data. Please check the database connection.")
+if garbage_df.empty or oil_spill_df.empty:
+    st.error("Failed to load data. Please check the Supabase connection.")
     st.stop()
 
-# Convert the Degrees Minutes Seconds format to Degrees for Folium plotting in the oil_spill_df
+# Convert the Degrees Minutes Seconds format to Degrees for Folium plotting
 def dms_to_dd(dms_value):
-    parts = dms_value.replace(',', '.').split('.')
-    degrees = float(parts[0])
-    minutes = 0
-    seconds = 0
-    if len(parts) > 1:
-        minutes = float(parts[1])
-    if len(parts) > 2:
-        seconds = float(parts[2])
-    dd_value = degrees + (minutes / 60) + (seconds / 3600)
-    return dd_value
-
-oil_spill_df['Latitude'] = oil_spill_df['Latitude'].apply(dms_to_dd)
-oil_spill_df['Longitude'] = oil_spill_df['Longitude'].apply(dms_to_dd)
+    """Convert European format DMS (degrees, minutes) to decimal degrees"""
+    if pd.isna(dms_value):
+        return None
+    try:
+        parts = str(dms_value).replace(',', '.').split('.')
+        degrees = float(parts[0])
+        minutes = 0
+        seconds = 0
+        if len(parts) > 1:
+            minutes = float(parts[1])
+        if len(parts) > 2:
+            seconds = float(parts[2])
+        dd_value = degrees + (minutes / 60) + (seconds / 3600)
+        return dd_value
+    except (ValueError, TypeError, IndexError):
+        return None
 
 st.markdown('''
 ## Understanding Marine Environmental Impact
@@ -169,8 +185,13 @@ images_column, description_column = st.columns(2)
 with images_column:
     st.subheader("Oil Spills: Impact on Wildlife")
     st.image(oil_image, caption="MSNBC showcases a photo of the sea affected by the BP's oil spill")
-    barrels_spilled = oil_spill_df['Barrels'].sum()
-    recorded_spills = oil_spill_df.shape[0]
+    
+    # Safely handle oil spill metrics
+    barrels_spilled = 0
+    if not oil_spill_df.empty and 'barrels' in oil_spill_df.columns:
+        barrels_spilled = oil_spill_df['barrels'].sum()
+    recorded_spills = len(oil_spill_df)
+    
     right_metric, left_metric = st.columns(2)
     with right_metric:
         st.metric(label= ":oil_drum: Number of Barrels of Oil Spilled", value=barrels_spilled)
@@ -181,44 +202,121 @@ with images_column:
 with description_column:
     st.subheader("Garbage Patches: Impact on Wildlife")
     st.image(plastic_image, caption="WWF showcases a photo of a turtle affected by plastic pollution")
-    recorded_spills = len(garbage_df)
-    garbage_df['Total_Pieces_L'] = pd.to_numeric(garbage_df['Total_Pieces_L'], errors='coerce')
-    plastic_density = garbage_df['Total_Pieces_L'].sum()
+    recorded_garbage = len(garbage_df)
+    
+    plastic_density = 0
+    if not garbage_df.empty and 'total_pieces_l' in garbage_df.columns:
+        garbage_df['total_pieces_l'] = pd.to_numeric(garbage_df['total_pieces_l'], errors='coerce')
+        plastic_density = garbage_df['total_pieces_l'].sum()
+    
     right_metric, left_metric = st.columns(2)
     with right_metric:
         st.metric(label=":roll_of_paper: Plastic Pieces Found in Oceans", value=plastic_density)
     with left_metric:
-        st.metric(label=":world_map: Number of Patches as big as the Pacific Garbage Circle", value=recorded_spills)
+        st.metric(label=":world_map: Number of Patches as big as the Pacific Garbage Circle", value=recorded_garbage)
         
 st.divider()
 
-# Create a geom obj for plotting
-def prepare_heatmap(df,adn):
-    df[['Latitude','Longitude']]=df[['Latitude','Longitude']].astype(dtype=float)
-    df[adn] = df[adn].astype(dtype=float)
-    df['Geometry'] = pd.Series([(df.loc[i,'Latitude'],df.loc[i,'Longitude']) for i in range(len(df['Latitude']))])
+def prepare_heatmap(df, value_column, is_oil_spill=False):
+    """Prepare DataFrame for heatmap plotting"""
+    if df.empty or 'latitude' not in df.columns or 'longitude' not in df.columns:
+        st.warning(f"Missing required columns for heatmap. Available columns: {list(df.columns)}")
+        return
+        
+    df = df.copy()
     
-def to_datetime(df,date_col='Date',frmt='%Y-%m-%d'):
-    df[date_col] =pd.to_datetime(df[date_col],errors='coerce')
-    df['year'] = df[date_col].dt.year
+    if is_oil_spill:
+        # convert European format coordinates for oil spill data
+        df['latitude'] = df['latitude'].apply(dms_to_dd)
+        df['longitude'] = df['longitude'].apply(dms_to_dd)
+    else:
+        # for marine debris data, just convert to float
+        df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+        df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+    
+    # convert value column to float if it exists
+    if value_column in df.columns:
+        df[value_column] = pd.to_numeric(df[value_column].astype(str).str.replace(',', '.'), errors='coerce')
+    
+    # drop any rows where conversion failed (resulted in None)
+    df = df.dropna(subset=['latitude', 'longitude'])
+    
+    # create geometry column for mapping
+    df['geometry'] = pd.Series([(lat, lon) 
+                               for lat, lon in zip(df['latitude'], df['longitude'])])
+    
+    return df
 
-# Apply the get_geom function
-prepare_heatmap(garbage_df,'Total_Pieces_L')
-prepare_heatmap(oil_spill_df, "Barrels")
+garbage_df = prepare_heatmap(garbage_df, 'total_pieces_l', is_oil_spill=False)
+oil_spill_df = prepare_heatmap(oil_spill_df, 'barrels', is_oil_spill=True)
 
-# Apply Date Time function
-to_datetime(garbage_df)
+def to_datetime(df, date_col='date', frmt=None):
+    """Convert date column to datetime and extract year
+    Args:
+        df (pd.DataFrame): Input dataframe
+        date_col (str): Name of the date column
+        frmt (str): Format string for date parsing. If None, will try multiple formats
+    Returns:
+        pd.DataFrame: DataFrame with converted dates and added year column
+    """
+    if frmt is None:
+        # Try different date formats based on the data source
+        if 'oil_spill' in df.columns or 'barrels' in df.columns:
+            # For oil spill data (DD.MM.YY format)
+            df[date_col] = pd.to_datetime(df[date_col], format='%d.%m.%y', errors='coerce')
+            # Fix years for dates before 2000
+            df['year'] = df[date_col].dt.year.apply(lambda x: x + 1900 if x and x < 100 else x)
+            # Update dates with corrected years
+            df[date_col] = pd.to_datetime(df.apply(
+                lambda row: row[date_col].replace(year=row['year']) if pd.notnull(row[date_col]) else row[date_col],
+                axis=1
+            ))
+        else:
+            # For other data (assuming ISO format YYYY-MM-DD)
+            df[date_col] = pd.to_datetime(df[date_col], format='%Y-%m-%d', errors='coerce')
+            df['year'] = df[date_col].dt.year
+    else:
+        df[date_col] = pd.to_datetime(df[date_col], format=frmt, errors='coerce')
+        df['year'] = df[date_col].dt.year
+    
+    return df
 
-# Find the ideal frame for loading the render window
-start_loc_plastic= (np.mean(garbage_df['Latitude']),np.mean(garbage_df['Longitude']))
-start_loc_oil= (np.mean(oil_spill_df['Latitude']),np.mean(oil_spill_df['Longitude']))
+# Convert date columns to datetime
+if not garbage_df.empty and 'date' in garbage_df.columns:
+    garbage_df = to_datetime(garbage_df)
+
+if not oil_spill_df.empty and 'date' in oil_spill_df.columns:
+    oil_spill_df = to_datetime(oil_spill_df)
+
+# Set default map location if DataFrames are empty
+if garbage_df.empty:
+    start_loc_plastic = (0, 0)
+else:
+    start_loc_plastic = (np.mean(garbage_df['latitude']), np.mean(garbage_df['longitude']))
+
+if oil_spill_df.empty:
+    start_loc_oil = (0, 0)
+else:
+    start_loc_oil = (np.mean(oil_spill_df['latitude']), np.mean(oil_spill_df['longitude']))
+
+if start_loc_plastic == (0, 0) and start_loc_oil == (0, 0):
+    map_center = (20, 0) 
+else:
+    map_center = start_loc_plastic if start_loc_plastic != (0, 0) else start_loc_oil
+
+# init the map with the determined center
+m_1 = folium.Map(location=map_center,
+                 zoom_start=2,
+                 min_zoom=1.5,
+                 tiles='CartoDB positron',
+                 attr="<a href=https://endless-sky.github.io/>Endless Sky</a>")
 
 st.markdown('''
 ## Visualizing the Impact of Oil Spills and Garbage Patches
 *Use the multi-select button to view the layers/attributes*
             ''')
 
-# Add custom CSS to reduce spacing
+# add custom CSS to reduce spacing
 st.markdown("""
 <style>
     .block-container {
@@ -232,12 +330,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Garbage & Oil Heatmaps
-m_1=folium.Map(location=start_loc_plastic,
-              zoom_start=2,
-              min_zoom=1.5,
-              tiles='CartoDB positron',
-              attr="<a href=https://endless-sky.github.io/>Endless Sky</a>")
-
 col1, col2 = st.columns(2)
 with col1:
     show_heatmap_garbage = st.checkbox("Show Garbage Heatmap")
@@ -247,59 +339,63 @@ with col2:
     show_oil_markers = st.checkbox("Show Oil Spill Markers")
     
 if show_heatmap_garbage:
-    HeatMap(data=garbage_df[['Latitude', 'Longitude', 'Total_Pieces_L']].values, radius=10, blur=5,
-            # gradient={.1: '#A1887F', .3: "#795548", 1: '#3E2723'}
-            ).add_to(m_1)
-    colormap = cm.LinearColormap(colors=['blue', 'lightgreen', 'yellow', 'orange', 'red' ],
-                                  vmin=garbage_df['Total_Pieces_L'].min(),
-                                  vmax=garbage_df['Total_Pieces_L'].max(),
-                                  caption='Total Pieces of Garbage')
-
-    # Add colormap legend to the map at the top left corner
-    colormap.add_to(m_1)
+    if not garbage_df.empty and all(col in garbage_df.columns for col in ['latitude', 'longitude', 'total_pieces_l']):
+        HeatMap(data=garbage_df[['latitude', 'longitude', 'total_pieces_l']].values, radius=10, blur=5).add_to(m_1)
+        colormap = cm.LinearColormap(colors=['blue', 'lightgreen', 'yellow', 'orange', 'red'],
+                                   vmin=garbage_df['total_pieces_l'].min(),
+                                   vmax=garbage_df['total_pieces_l'].max())
+        colormap.add_to(m_1)
+    else:
+        st.warning("Missing required columns for garbage heatmap")
 
 if show_heatmap_oil:
-    HeatMap(data=oil_spill_df[['Latitude', 'Longitude', 'Barrels']].values, 
-            radius=10, 
-            blur=5,
-            gradient={'0.2': 'beige', '0.6': 'brown', '1.0': 'black'}).add_to(m_1)
-    colormap = cm.LinearColormap(colors=['blue', 'lightgreen', 'yellow', 'orange', 'red' ],
-                                  vmin=oil_spill_df['Barrels'].min(),
-                                  vmax=oil_spill_df['Barrels'].max(),
-                                  caption='Total Barrels of Oil Spilled')
-    colormap.add_to(m_1)
+    if not oil_spill_df.empty and all(col in oil_spill_df.columns for col in ['latitude', 'longitude', 'barrels']):
+        HeatMap(data=oil_spill_df[['latitude', 'longitude', 'barrels']].values, radius=10, blur=5).add_to(m_1)
+        colormap = cm.LinearColormap(colors=['blue', 'lightgreen', 'yellow', 'orange', 'red'],
+                                   vmin=oil_spill_df['barrels'].min(),
+                                   vmax=oil_spill_df['barrels'].max())
+        colormap.add_to(m_1)
+    else:
+        st.warning("Missing required columns for oil spill heatmap")
 
 if show_oil_markers:
-    for _, row in oil_spill_df.iterrows():
-        popup_content = f"""
-        <h3>{row['Oil Spill Name']}</h3>
-        <p><b>Location:</b> {row['Location']}</p>
-        <p><b>Date:</b> {row['Date']}</p>
-        <p><b>Number of Barrels:</b> {row['Barrels']}</p>
-        <p><b>Impact Regions:</b> {row['Impact Regions']}</p>
-        <p><b>Organisms Affected:</b> {row['Organisms Affected']}</p>
-        """
-        folium.Marker(location=[row['Latitude'], row['Longitude']],
-                      tooltip=f"<b>{row['Oil Spill Name']}</b><br># of Barrels Spilled: {row['Barrels']}",
-                      popup=folium.Popup(popup_content, max_width=800),
-                      icon=folium.Icon(icon='tint', prefix='fa', color='black')
-                      ).add_to(m_1)
+    if not oil_spill_df.empty and all(col in oil_spill_df.columns for col in ['latitude', 'longitude', 'barrels', 'date']):
+        for idx, row in oil_spill_df.iterrows():
+            popup_text = f"""
+            <b>Oil Spill</b><br>
+            Date: {row['date']}<br>
+            Amount Spilled: {row['barrels']} barrels<br>
+            """
+            folium.CircleMarker(
+                location=[row['latitude'], row['longitude']],
+                radius=5,
+                popup=popup_text,
+                color='red',
+                fill=True
+            ).add_to(m_1)
+    else:
+        st.warning("Missing required columns for oil spill markers")
 
 if show_garbage_markers:
-        # Add the Pacific Garbage Patch CircleMarker
-    latitude, longitude = 38.5, -145
-    radius = 70  # Approximately 0.62 million square miles in meters
-    folium.CircleMarker(location=[latitude, longitude],
-                        radius=radius,
-                        color='red',
-                        fill=True,
-                        fill_color='red',
-                        fill_opacity=0.2,
-                        popup='Pacific Garbage Patch').add_to(m_1)
+    if not garbage_df.empty and all(col in garbage_df.columns for col in ['latitude', 'longitude', 'total_pieces_l', 'date']):
+        for idx, row in garbage_df.iterrows():
+            popup_text = f"""
+            <b>Marine Debris</b><br>
+            Date: {row['date']}<br>
+            Total Pieces: {row['total_pieces_l']}<br>
+            """
+            folium.CircleMarker(
+                location=[row['latitude'], row['longitude']],
+                radius=5,
+                popup=popup_text,
+                color='blue',
+                fill=True
+            ).add_to(m_1)
+    else:
+        st.warning("Missing required columns for garbage markers")
 
 st_folium(m_1, width=1300)
 
-# Report forms section
 st.markdown("## Report Environmental Incidents")
 
 # Collection forms
