@@ -3,10 +3,11 @@
 This project utilizes geospatial data visualization techniques to map and analyze incidents of oil spills and garbage patches, providing valuable insights into their locations, impacts, and trends.
 
 ## 🏆 Winner of NJIT Hackathon Fall 23 (Best use of Google Cloud)
+> Orignally used to use [GCP(Google Cloud Storage, Vertex AI)](https://github.com/mahakanakala/kelp-keep-the-oceans-safe/tree/7e6441f605ed990e71e0ab532afcd276d5320a1e) but switched to PostgreSQL & Supabase
 
 ## Table of Contents
-
-- [Kelp Keep the Oceans Safe](#kelp-keep-the-oceans-safe)
+- [Visit the website](#visit-the-website)
+  - [🏆 Winner of NJIT Hackathon Fall 23 (Best use of Google Cloud)](#-winner-of-njit-hackathon-fall-23-best-use-of-google-cloud)
   - [Table of Contents](#table-of-contents)
   - [Introduction](#introduction)
   - [Features](#features)
@@ -25,28 +26,14 @@ It is designed to inform and engage users by visualizing real-time data about oi
 - **Question-Answering Chatbot:** Interact with a chatbot developed using VerteAI to ask questions related to ocean conservation and receive informative responses.
 
 ## Technologies Used
-
 - **Streamlit:** Web framework for creating interactive and customizable dashboards.
 - **Pandas:** Data manipulation library for handling and analyzing tabular data.
 - **Folium:** Python wrapper for Leaflet.js, used for creating interactive maps.
-- **Google Cloud Storage:** Cloud-based storage service for storing user-uploaded images and data.
-- **Transformers:** Library for natural language processing tasks, used for the question-answering chatbot.
-- **Vertex AI:** Google Cloud's machine learning platform for building, training, and deploying machine learning models.
+- **PostgresSQL:** Database for storing incident reports, including details such as dates, locations, descriptions, and photo URLs.
+- **Supabase:** Backend for managing both structured data and file storage with Row-Level Security (RLS) policies ensuring data integrity and access control.
 
 ## How to Use
-
-1. **Install Dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Run the Application:**
-   ```bash
-   streamlit run app.py
-   ```
-   The application will be accessible at `http://localhost:8501`.
-
-3. **Interact with the App:**
+**Interact with the App:**
    - Explore the interactive map to view incidents of oil spills and garbage patches.
    - Click on map markers to view detailed information about each incident.
    - Use the chatbot to ask questions about ocean conservation and environmental initiatives.

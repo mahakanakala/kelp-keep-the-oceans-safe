@@ -346,52 +346,48 @@ st_folium(m_1, width=1300)
 
 st.markdown("## Report Environmental Incidents")
 
+def render_incident_form(incident_type, col):
+    """Render and handle the incident reporting form."""
+    with col:
+        st.subheader(f"Report {incident_type.capitalize()} Incident")
+        
+        incident_date = st.date_input("Date of Incident", key=f"{incident_type}_date")
+        incident_location = st.text_input("Location", key=f"{incident_type}_location")
+        incident_description = st.text_area("Description", key=f"{incident_type}_description")
+        incident_photo = st.file_uploader(
+            "Upload Photo of Incident", type=["jpg", "jpeg", "png"], key=f"{incident_type}_photo"
+        )
+
+        # Form
+        if st.button(f"Report {incident_type.capitalize()} Incident", key=f"{incident_type}_button"):
+            # Validation
+            if not incident_date:
+                st.error("Please select a date for the incident.")
+            elif not incident_location.strip():
+                st.error("Please enter a location for the incident.")
+            elif not incident_description.strip():
+                st.error("Please provide a description of the incident.")
+            elif not incident_photo:
+                st.error("Please provide a picture of the incident.")
+            else:
+                # Submit the report
+                time.sleep(0.5)
+                success = save_incident_report(
+                    incident_type,
+                    incident_date,
+                    incident_location.strip(),
+                    incident_description.strip(),
+                    incident_photo,
+                )
+                if success:
+                    st.toast(f"{incident_type.capitalize()} incident reported successfully!")
+                else:
+                    st.toast(f"Failed to report {incident_type} incident.")
+
 # Collection forms
 oil_col, garbage_col = st.columns(2)
-
-with oil_col:
-    st.subheader("Report Oil Spill Incident")
-    oil_spill_date = st.date_input("Date of Incident")
-    oil_spill_location = st.text_input("Location")
-    oil_spill_description = st.text_area("Description")
-    oil_spill_photo = st.file_uploader("Upload Photo of Incident", type=["jpg", "jpeg", "png"])
-
-    if st.button("Report Oil Spill"):
-        time.sleep(0.5)
-        st.toast('Reported Oil Spill Incident')
-        success = save_incident_report(
-            "oil",
-            oil_spill_date if oil_spill_date else None,
-            oil_spill_location.strip() if oil_spill_location.strip() else None,
-            oil_spill_description.strip() if oil_spill_description.strip() else None,
-            oil_spill_photo,
-        )
-        if success:
-            st.success("Oil spill incident reported successfully!")
-        else:
-            st.error("Failed to report oil spill incident.")
-
-with garbage_col:
-    st.subheader("Report Garbage Incident")
-    garbage_date = st.date_input("Date of Incident", key="garbage_date")
-    garbage_location = st.text_input("Location", key="garbage_location")
-    garbage_description = st.text_area("Description", key="garbage_description")
-    garbage_photo = st.file_uploader("Upload Photo of Incident", type=["jpg", "jpeg", "png"], key="garbage_image")
-
-    if st.button("Report Garbage Incident"):
-        time.sleep(0.5)
-        st.toast('Reported Garbage Incident')
-        success = save_incident_report(
-            "garbage",
-            garbage_date if garbage_date else None,
-            garbage_location.strip() if garbage_location.strip() else None,
-            garbage_description.strip() if garbage_description.strip() else None,
-            garbage_photo,
-        )
-        if success:
-            st.success("Garbage incident reported successfully!")
-        else:
-            st.error("Failed to report garbage incident.")
+render_incident_form("oil", oil_col)
+render_incident_form("garbage", garbage_col)
 
 # Sidebar with Chatbot
 st.sidebar.title("Question Answering Chatbot using RoBERTa")
