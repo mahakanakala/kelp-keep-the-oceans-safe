@@ -69,33 +69,6 @@ def load_data():
         st.error(f"Error loading data from Supabase: {str(e)}")
         return pd.DataFrame(), pd.DataFrame()
 
-def save_incident_report(incident_type, date, location, description, photo_path):
-    """Save an incident report to the database"""
-    try:
-        conn = init_supabase()
-        if conn is None:
-            return False
-            
-        table_name = "reported_oil_spills" if incident_type == "oil" else "reported_garbage_incidents"
-        
-        with conn.connect() as conn:
-            conn.execute(
-                text(f"""
-                    INSERT INTO {table_name} (date, location, description, photo_path)
-                    VALUES (:date, :location, :description, :photo_path)
-                """),
-                {
-                    "date": date,
-                    "location": location,
-                    "description": description,
-                    "photo_path": photo_path
-                }
-            )
-            conn.commit()
-        return True
-    except Exception as e:
-        st.error(f"Error saving report: {str(e)}")
-        return False
 
 def get_recent_reports():
     """Get recent incident reports from both tables"""
@@ -120,30 +93,6 @@ def get_recent_reports():
         return None, None
 
 st.title("Kelp Keep the Oceans Safe")
-
-# # Initialize database connection
-# if test_connection():
-#     st.success("✅ Connected to database successfully!")
-    
-#     # Display table information
-#     if st.button("Show Database Info"):
-#         table_info = get_table_info()
-        
-#         st.write("### Database Tables")
-#         for table_name, info in table_info.items():
-#             st.write(f"- **{table_name}**: {info['count']} rows")
-            
-#             # Show sample data if available
-#             if info['sample']:
-#                 st.write("Sample data:")
-#                 st.dataframe(info['sample'])
-# else:
-#     st.error("❌ Could not connect to database. Please check your configuration.")
-# Debug info
-# st.write("Oil Spill DataFrame Info:")
-# st.write("Columns:", list(oil_spill_df.columns) if not oil_spill_df.empty else "No data")
-# st.write("\nGarbage DataFrame Info:")
-# st.write("Columns:", list(garbage_df.columns) if not garbage_df.empty else "No data")
 
 # Load data
 garbage_df, oil_spill_df = load_data()
@@ -304,7 +253,6 @@ if start_loc_plastic == (0, 0) and start_loc_oil == (0, 0):
 else:
     map_center = start_loc_plastic if start_loc_plastic != (0, 0) else start_loc_oil
 
-# init the map with the determined center
 m_1 = folium.Map(location=map_center,
                  zoom_start=2,
                  min_zoom=1.5,
@@ -400,6 +348,7 @@ st.markdown("## Report Environmental Incidents")
 
 # Collection forms
 oil_col, garbage_col = st.columns(2)
+
 with oil_col:
     st.subheader("Report Oil Spill Incident")
     oil_spill_date = st.date_input("Date of Incident")
@@ -408,34 +357,41 @@ with oil_col:
     oil_spill_photo = st.file_uploader("Upload Photo of Incident", type=["jpg", "jpeg", "png"])
 
     if st.button("Report Oil Spill"):
-        time.sleep(.5)
+        time.sleep(0.5)
         st.toast('Reported Oil Spill Incident')
-        if oil_spill_date and oil_spill_location and oil_spill_description and oil_spill_photo:
-            # Save image locally
-            image_path = f'uploads/oil_spills/{oil_spill_date}.jpg'
-            with open(image_path, 'wb') as f:
-                f.write(oil_spill_photo.getvalue())
-
-            save_incident_report("oil", oil_spill_date, oil_spill_location, oil_spill_description, image_path)
+        success = save_incident_report(
+            "oil",
+            oil_spill_date if oil_spill_date else None,
+            oil_spill_location.strip() if oil_spill_location.strip() else None,
+            oil_spill_description.strip() if oil_spill_description.strip() else None,
+            oil_spill_photo,
+        )
+        if success:
+            st.success("Oil spill incident reported successfully!")
+        else:
+            st.error("Failed to report oil spill incident.")
 
 with garbage_col:
     st.subheader("Report Garbage Incident")
     garbage_date = st.date_input("Date of Incident", key="garbage_date")
-    garbage_location = st.text_input("Location",  key="garbage_location")
-    garbage_description = st.text_area("Description",  key="garbage_description")
-    garbage_photo = st.file_uploader("Upload Photo of Incident", type=["jpg", "jpeg", "png"],  key="garbage_image")
+    garbage_location = st.text_input("Location", key="garbage_location")
+    garbage_description = st.text_area("Description", key="garbage_description")
+    garbage_photo = st.file_uploader("Upload Photo of Incident", type=["jpg", "jpeg", "png"], key="garbage_image")
 
     if st.button("Report Garbage Incident"):
-        time.sleep(.5)
+        time.sleep(0.5)
         st.toast('Reported Garbage Incident')
-        if garbage_date and garbage_location and garbage_description and garbage_photo:
-            # Save image locally
-            image_path = f'uploads/garbage/{garbage_date}.jpg'
-            with open(image_path, 'wb') as f:
-                f.write(garbage_photo.getvalue())
-
-            save_incident_report("garbage", garbage_date, garbage_location, garbage_description, image_path)
-
+        success = save_incident_report(
+            "garbage",
+            garbage_date if garbage_date else None,
+            garbage_location.strip() if garbage_location.strip() else None,
+            garbage_description.strip() if garbage_description.strip() else None,
+            garbage_photo,
+        )
+        if success:
+            st.success("Garbage incident reported successfully!")
+        else:
+            st.error("Failed to report garbage incident.")
 
 # Sidebar with Chatbot
 st.sidebar.title("Question Answering Chatbot using RoBERTa")
